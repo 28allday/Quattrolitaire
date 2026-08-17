@@ -83,17 +83,24 @@ Item {
   // it lands, self-register on first open. Idempotent, jq-guarded.
   //
   // Harness: sh -c <script> plugin-selfref <id> — $0 is the label, $1 the id.
+  // The id arrives as an argument rather than spliced into the script, so no
+  // text is ever interpolated into shell code. The rewrite refuses to follow a
+  // symlink, keeps the working copy private, and carries the original file's
+  // mode across so a hand-tightened shell.json is not widened by the swap.
   property bool selfRefEnsured: false
   readonly property string ensureSelfRefScript: [
+    'umask 077',
     'id="$1"',
     'f="$HOME/.config/omarchy/shell.json"',
     '[ -f "$f" ] || exit 0',
+    '[ -L "$f" ] && exit 0',
     'jq -e --arg id "$id" \'any(.plugins[]?; (.id // empty) == $id)\' "$f" >/dev/null && exit 0',
     'tmp="$f.selfref.$$"',
     'jq --arg id "$id" \'.plugins = ((.plugins // []) + [{id: $id}])\' "$f" > "$tmp" || {',
     '  rm -f "$tmp"; exit 1;',
     '}',
     '[ -s "$tmp" ] || { rm -f "$tmp"; exit 1; }',
+    'chmod --reference="$f" "$tmp" 2>/dev/null || chmod 600 "$tmp"',
     'mv "$tmp" "$f"'
   ].join("\n")
 

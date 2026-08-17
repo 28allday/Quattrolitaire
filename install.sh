@@ -2,7 +2,7 @@
 #
 # Quattrolitaire installer — Klondike for the Omarchy shell.
 #
-#   curl -fsSL https://raw.githubusercontent.com/28allday/Quattrolitaire/main/install.sh | bash
+# Run it from a clone of the repo:  ./install.sh
 #
 # What it does:
 #   1. Registers the plugin (omarchy plugin add — never a file copy, or

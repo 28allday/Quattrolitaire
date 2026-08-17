@@ -2,7 +2,8 @@
 
 Klondike solitaire as a native Omarchy shell plugin. A drag-and-drop card
 table with an illustrated art-deco deck, on felt coloured from the active
-Omarchy theme. No external process, nothing to install.
+Omarchy theme. The deck ships in the repo, so there is nothing to fetch and
+nothing to build.
 
 ![The table mid-game](screenshots/table.jpg)
 
@@ -31,16 +32,46 @@ Then click the ♠ in the bar, or bind a key to:
 omarchy-shell shell toggle nosignal.quattrolitaire
 ```
 
-## Keys
+`install.sh` takes two optional overrides: `QUATTROLITAIRE_SECTION` picks the
+bar section (`left`, `center` or `right`, default `right`), and
+`QUATTROLITAIRE_REPO` registers the plugin from a fork instead.
 
-| Key | Action |
-| --- | --- |
-| `space` / `d` | Turn a card from the stock |
-| `n` | New game |
-| `u` / `z` | Undo |
-| `a` | Auto-finish (once nothing is face down) |
-| `1` / `3` | Draw one / draw three |
-| `esc` / `q` | Close |
+## Removal
+
+```bash
+omarchy plugin remove nosignal.quattrolitaire
+```
+
+That unregisters the plugin and drops its bar icon. The saved game is left
+behind; delete it too with:
+
+```bash
+rm -rf ~/.local/state/omarchy-quattrolitaire
+```
+
+## Dependencies
+
+Omarchy 4 and its shell — no other runtime dependency for play itself. One
+piece of plumbing needs **`jq`**, which Omarchy already installs: see below.
+
+## What it writes, and what it does not
+
+- `~/.local/state/omarchy-quattrolitaire/state.json` — the game in progress,
+  the draw mode and the win record. Written after each move.
+- `~/.config/omarchy/shell.json` — **on first open**, the plugin appends its
+  own `{"id": "nosignal.quattrolitaire"}` entry to `plugins[]` if one is not
+  already there, using `jq`. This is a workaround: `omarchy plugin enable`
+  writes only the bar-layout entry for a plugin that is both a panel and a
+  bar widget, so without that entry the keybinding stops working the moment
+  the bar icon is removed. The edit is idempotent, appends only, changes no
+  other setting, and goes away once upstream
+  [PR #6510](https://github.com/basecamp/omarchy/pull/6510) lands. The code
+  is at the top of `Panel.qml` if you would rather read it than take my word.
+
+Nothing else on the system is touched. The plugin makes **no network
+requests**, needs no credentials, runs nothing privileged, and starts no
+process beyond the `jq` edit above and a `mkdir -p` for its own state
+directory.
 
 ## Scoring
 
