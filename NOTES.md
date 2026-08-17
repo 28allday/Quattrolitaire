@@ -4,11 +4,10 @@ Working notes for this repo. Read before changing anything in `Panel.qml`.
 
 ## Status
 
-**0.1.0, unreleased.** Playable and in daily use. Home is the **private**
+**0.1.0, untagged.** Playable and in daily use. Home is the **public**
 `28allday/Quattrolitaire` on GitHub, `main`, pushed as a single squashed
-commit — while it is private, the `omarchy plugin add` line in the README only
-works for someone with access to the repo. Public is a later decision, and
-nothing blocks it.
+commit. The `omarchy plugin add` line in the README works for anyone. No
+release is tagged yet.
 
 Installed here as a dev symlink
 (`~/.config/omarchy/plugins/nosignal.quattrolitaire` → the repo), enabled in the
