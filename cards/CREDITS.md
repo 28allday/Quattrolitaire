@@ -5,8 +5,9 @@ for this project — an art-deco series, one car per card, generated with an
 image model and then indexed by hand so the rank and suit marks stay sharp and
 correct at small sizes.
 
-The card back started life as an Omarchy wallpaper by **vulturetone** —
-reframed for the card here, and credited with thanks.
+The card back started life as an Omarchy wallpaper by **vulturetone**:
+`1-quattro.jpg` from the stock `tokyo-night` theme, which is where this plugin
+got its name. Reframed for the card here, and credited with thanks.
 
 ## Files
 
@@ -16,10 +17,12 @@ clubs, `S` spades. `Panel.qml` builds that code straight from its own rank
 and suit tables, so a card's file is found by name alone.
 
 `back.png` is the shared face-down back: a rally-car scene at sunset, from an
-Omarchy wallpaper by **vulturetone**. The framing, extension and resizing
-described next are the only part done here.
+Omarchy wallpaper by **vulturetone** (`tokyo-night/backgrounds/1-quattro.jpg`,
+5120 × 2880). The framing, extension and resizing described next are the only
+part done here — the card works from a 2696 × 2880 crop of the wallpaper,
+which keeps the car and drops the sun and the banner to its right.
 
-The source is nearly square, and the deck is a strict 5:7, so it was
+The crop is nearly square, and the deck is a strict 5:7, so it was
 extended rather than cropped — cropping to fit cut either the front bumper or
 the rear wing. The top sky band and the bottom ground band were mirrored
 outward, blurred and graded darker toward the edges, giving a 5:7 canvas with
