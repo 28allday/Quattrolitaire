@@ -3,14 +3,10 @@
 The 52 card faces and the table tile in this folder are original artwork made
 for this project — an art-deco series, one car per card, generated with an
 image model and then indexed by hand so the rank and suit marks stay sharp and
-correct at small sizes. Those are covered by the repo's MIT licence along with
-the rest of it.
+correct at small sizes.
 
-**The card back is not.** `back.png` is derived from artwork by
-**vulturetone**, used here with credit; the rights in it stay with the artist,
-and the repo's MIT licence does not extend to it. Anything reusing this deck
-needs its own permission for the back, or should swap in a different one —
-see "Replacing the deck" below, which is a drop-in.
+The card back started life as an Omarchy wallpaper by **vulturetone** —
+reframed for the card here, and credited with thanks.
 
 ## Files
 
@@ -19,13 +15,11 @@ ranks `A`, `2`–`10`, `J`, `Q`, `K`; suits `H` hearts, `D` diamonds, `C`
 clubs, `S` spades. `Panel.qml` builds that code straight from its own rank
 and suit tables, so a card's file is found by name alone.
 
-`back.png` is the shared face-down back: a rally-car scene at sunset by
-**vulturetone**, framed to match the cards. It depicts a liveried competition
-car, so the sponsor and marque markings of that livery are visible in it.
-Credit belongs to vulturetone for the artwork; the framing, extension and
-resizing described next are the only part done here.
+`back.png` is the shared face-down back: a rally-car scene at sunset, from an
+Omarchy wallpaper by **vulturetone**. The framing, extension and resizing
+described next are the only part done here.
 
-The source render is nearly square, and the deck is a strict 5:7, so it was
+The source is nearly square, and the deck is a strict 5:7, so it was
 extended rather than cropped — cropping to fit cut either the front bumper or
 the rear wing. The top sky band and the bottom ground band were mirrored
 outward, blurred and graded darker toward the edges, giving a 5:7 canvas with

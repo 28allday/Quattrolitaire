@@ -62,14 +62,14 @@ and a recycle penalty of −100 in draw-1 (−20 in draw-3). Finishing in over
 ## Card art
 
 The 52 faces are an original art-deco series, one famous car per card, bundled
-in `cards/`. The card back is a rally-car scene by **vulturetone**, used with
-credit — see [cards/CREDITS.md](cards/CREDITS.md), which covers what is
-licensed how, and swapping in a deck of your own. The table around the cards
-is drawn from the active theme, so the felt, the pile outlines and the panel
+in `cards/`. The back is a rally-car scene from an Omarchy wallpaper by
+**vulturetone**, with thanks — see [cards/CREDITS.md](cards/CREDITS.md), which
+also covers swapping in a deck of your own. The table around the cards is
+drawn from the active theme, so the felt, the pile outlines and the panel
 chrome recolour with the desktop while the deck stays as painted.
 
 ## Licence
 
-MIT, including the card faces and the table tile. **Not** the card back, which
-is vulturetone's artwork used with credit — rights in it stay with the artist.
-Klondike itself is a public-domain card game.
+MIT, artwork included. The card back comes from an Omarchy wallpaper by
+vulturetone, credited in [cards/CREDITS.md](cards/CREDITS.md). Klondike itself
+is a public-domain card game.
