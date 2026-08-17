@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "id": "nosignal.quattrolitaire",
+  "name": "Quattrolitaire",
+  "version": "0.1.0",
+  "author": "Gavin Nugent",
+  "license": "MIT",
+  "description": "Klondike solitaire for omarchy-shell. Drag-and-drop card table drawn entirely in QML, coloured from the active theme, with undo, autocomplete, scoring and a game that survives a shell restart. Summon with: omarchy-shell shell toggle nosignal.quattrolitaire",
+  "kinds": [
+    "panel",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "panel": "Panel.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Quattrolitaire",
+    "description": "Bar icon that toggles the Quattrolitaire table",
+    "category": "Fun",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
