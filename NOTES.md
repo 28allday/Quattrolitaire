@@ -113,14 +113,14 @@ harness lives outside the repo (it is throwaway scaffolding), and the repo's
 own contract is that `NOTES.md` documents what could not be automated: the
 live-shell dragging and cascade still want a human with a mouse.
 
-Note on the harness state: the two runner copies (`main.qml` plain-qml and
-`shell.qml` quickshell) carry a few stale expectations from mid-development
-drafts (the mid-run pickup checks and the restore section's fixture, which
-is built from a board already missing cards, so its refusal is the correct
-behavior being labeled wrong). The reveal-flip checks added after the
-klondike borrow — schedule, flush, undo-cancels, deal-settles — all pass;
-run them with `HOME=$(pwd)/home QT_QPA_PLATFORM=offscreen qs -p .` from the
-harness dir (the launch needs the sandbox HOME or a plugin import fails).
+The suite asserts on the model side only; the harness stubs `home` so the
+state file round-trips in a throwaway directory, and a readback FileView is
+armed right before the final reload so the eager startup load cannot trip
+`finish()` early. Two expectations worth restating because they decode
+non-obviously: grabbing mid-run is legal and takes the shorter top-aligned
+tail (a broken tail is what gets refused), and the completion fixtures must
+read K→A inside one suit block — with suits=2, blocks 0–3 are spades and
+4–7 are hearts, so a run like [26..14] is spades and [78..65] is hearts.
 
 ## Gotchas hit while building this
 

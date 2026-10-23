@@ -383,18 +383,29 @@ Item {
     return true
   }
 
-  function deal() {
+  // A deal lifts the clicked stock pile's round of ten out of the stock and
+  // feeds it across the tableau, column i taking the round's i-th card. The
+  // remaining piles slide down to fill the gap, so the pile on screen and
+  // the pile dealt are always the same one. Without a slot (keyboard, Deal
+  // button) the leftmost live pile is dealt, same as clicking it.
+  function deal(slot) {
     if (!root.canDeal || root.dragging) return
     root.flushFlip()          // an owed reveal settles before the row lands
     root.pushHistory()
 
-    var st = root.stock.slice()
+    var piles = Math.floor(root.stock.length / 10)
+    var from = slot === undefined || slot === null || slot < 0 || slot > 4
+               ? 0 : slot
+    if (from >= piles) return                 // an empty slot is not a deal
+    var round = root.stock.slice(from * 10, from * 10 + 10)
+
+    var st = root.stock.slice(0, from * 10)
+                    .concat(root.stock.slice(from * 10 + 10))
     var t = root.cloneT()
     var u = root.faceUp.slice()
     for (var i = 0; i < 10; i++) {
-      var c = st.pop()
-      t[i].push(c)
-      u[c] = true
+      t[i].push(round[i])
+      u[round[i]] = true
     }
     root.stock = st
     root.tabl = t
@@ -646,9 +657,9 @@ Item {
     var topY = 0
     var tabY = Math.round(ch * 1.34)
 
-    // Stock, five rounds of ten spread across the top row. The stock pops
-    // from the end, so the earliest block is the first out — the round a card
-    // belongs to is just its stock index cut into tens.
+    // Stock, piles of ten spread across the top row. The pile at slot k is
+    // the stock's cards at indices k*10..k*10+9 — the same pile a click
+    // deals, since deal(slot) lifts exactly that slice out.
     for (i = 0; i < root.stock.length; i++) {
       var round = Math.floor(i / 10)
       cards[root.stock[i]] = { x: colX[round], y: topY, z: 10 + i, up: false,
@@ -806,9 +817,11 @@ Item {
 
       MouseArea {
         anchors.fill: parent
-        enabled: slotItem.slot < 5
+        // Only a pile that still has cards takes clicks, and it deals
+        // itself: clicking pile k deals pile k's round.
+        enabled: slotItem.slot < 5 && root.stock.length >= (slotItem.slot + 1) * 10
         cursorShape: slotItem.slot < 5 && root.canDeal ? Qt.PointingHandCursor : Qt.ArrowCursor
-        onClicked: root.deal()
+        onClicked: root.deal(slotItem.slot)
       }
     }
   }
