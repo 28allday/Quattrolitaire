@@ -72,6 +72,10 @@ Item {
 
   property int suits: 2                         // 1 | 2 | 4, per game
   property var stock: []                        // face down, last element = next deal
+  // Which of the five top-row slots have had their pile dealt already. Piles
+  // never slide: a dealt pile empties its own slot and the others keep
+  // theirs, so a pile you click is always the pile you see there.
+  property var stockDealt: [false, false, false, false, false]
   property var tabl: [[], [], [], [], [], [], [], [], [], []]   // ten columns
   property var faceUp: []                       // 104 booleans, indexed by inst
   property var completed: []                    // suits of the sets taken off, in order
@@ -114,7 +118,7 @@ Item {
   function snapshot() {
     return JSON.stringify({
       s: root.stock, t: root.tabl, u: root.faceUp, f: root.completed,
-      sc: root.score, mv: root.moves, ps: root.deals
+      td: root.stockDealt, sc: root.score, mv: root.moves, ps: root.deals
     })
   }
 
@@ -134,6 +138,7 @@ Item {
     var st = JSON.parse(h.pop())
     root.history = h
     root.stock = st.s
+    root.stockDealt = Array.isArray(st.td) && st.td.length === 5 ? st.td : root.stockDealt
     root.tabl = st.t
     root.faceUp = st.u
     root.completed = st.f
@@ -173,6 +178,7 @@ Item {
 
     root.tabl = tab
     root.stock = deck.slice(p)                  // fifty cards, five deals of ten
+    root.stockDealt = [false, false, false, false, false]
     root.faceUp = up
     root.completed = []
     root.score = 500
@@ -385,22 +391,37 @@ Item {
 
   // A deal lifts the clicked stock pile's round of ten out of the stock and
   // feeds it across the tableau, column i taking the round's i-th card. The
-  // remaining piles slide down to fill the gap, so the pile on screen and
-  // the pile dealt are always the same one. Without a slot (keyboard, Deal
-  // button) the leftmost live pile is dealt, same as clicking it.
+  // remaining piles stay on their own slots, so the cards living in stock
+  // window w belong to the w-th pile whose slot has not been dealt yet.
+  // Without a slot (keyboard, Deal button) the leftmost live pile is dealt,
+  // same as clicking it.
   function deal(slot) {
     if (!root.canDeal || root.dragging) return
     root.flushFlip()          // an owed reveal settles before the row lands
     root.pushHistory()
 
-    var piles = Math.floor(root.stock.length / 10)
-    var from = slot === undefined || slot === null || slot < 0 || slot > 4
-               ? 0 : slot
-    if (from >= piles) return                 // an empty slot is not a deal
-    var round = root.stock.slice(from * 10, from * 10 + 10)
+    var from = slot
+    if (from === undefined || from === null || from < 0 || from > 4) {
+      from = -1                               // no slot: the leftmost live pile
+      for (var p2 = 0; p2 < 5; p2++) {
+        if (root.stockDealt[p2] !== true) { from = p2; break }
+      }
+      if (from < 0) return                    // nothing left in the stock
+    } else if (root.stockDealt[from] === true) {
+      return                                  // an already-dealt slot is not a deal
+    }
+    // The clicked slot's cards are the window of the live piles ordered
+    // before it — the slots under any dead piles are simply skipped.
+    var win = 0
+    for (var p = 0; p < from; p++) {
+      if (root.stockDealt[p] !== true) win++
+    }
+    var round = root.stock.slice(win * 10, win * 10 + 10)
 
-    var st = root.stock.slice(0, from * 10)
-                    .concat(root.stock.slice(from * 10 + 10))
+    var sd = root.stockDealt.slice()
+    sd[from] = true
+    var st = root.stock.slice(0, win * 10)
+                    .concat(root.stock.slice(win * 10 + 10))
     var t = root.cloneT()
     var u = root.faceUp.slice()
     for (var i = 0; i < 10; i++) {
@@ -408,6 +429,7 @@ Item {
       u[round[i]] = true
     }
     root.stock = st
+    root.stockDealt = sd
     root.tabl = t
     root.faceUp = u
     root.deals++
@@ -657,13 +679,22 @@ Item {
     var topY = 0
     var tabY = Math.round(ch * 1.34)
 
-    // Stock, piles of ten spread across the top row. The pile at slot k is
-    // the stock's cards at indices k*10..k*10+9 — the same pile a click
-    // deals, since deal(slot) lifts exactly that slice out.
-    for (i = 0; i < root.stock.length; i++) {
-      var round = Math.floor(i / 10)
-      cards[root.stock[i]] = { x: colX[round], y: topY, z: 10 + i, up: false,
-                               pile: "s" + round, idx: i }
+    // Stock, piles of ten spread across the top row. Each pile lives on its
+    // own slot for the whole game: the cards in stock window w belong to the
+    // w-th slot whose pile has not been dealt yet, and a click on slot k
+    // deals exactly that pile (deal() walks the same slot->window mapping).
+    var live = []
+    for (var s = 0; s < 5; s++) {
+      if (root.stockDealt[s] !== true) live.push(s)
+    }
+    for (var w = 0; w < live.length; w++) {
+      for (var j = 0; j < 10; j++) {
+        var i2 = w * 10 + j
+        if (i2 >= root.stock.length) break
+        var sc = root.stock[i2]
+        cards[sc] = { x: colX[live[w]], y: topY, z: 10 + i2, up: false,
+                      pile: "s" + live[w], idx: i2 }
+      }
     }
 
     // Tableau. The same fan-with-shrink logic as the Klondike board: face-up
@@ -817,9 +848,10 @@ Item {
 
       MouseArea {
         anchors.fill: parent
-        // Only a pile that still has cards takes clicks, and it deals
-        // itself: clicking pile k deals pile k's round.
-        enabled: slotItem.slot < 5 && root.stock.length >= (slotItem.slot + 1) * 10
+        // Only a pile that has not been dealt yet takes clicks, and it deals
+        // itself: clicking slot k's pile deals that pile, wherever live piles
+        // happen to sit.
+        enabled: slotItem.slot < 5 && root.stockDealt[slotItem.slot] !== true
         cursorShape: slotItem.slot < 5 && root.canDeal ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: root.deal(slotItem.slot)
       }
@@ -1138,7 +1170,7 @@ Item {
         game: (root.started && !root.won) ? {
           suits: root.suits,
           s: root.stock, t: root.tabl, u: root.faceUp, f: root.completed,
-          sc: root.score, mv: root.moves, ps: root.deals, sec: root.seconds
+          td: root.stockDealt, sc: root.score, mv: root.moves, ps: root.deals, sec: root.seconds
         } : null
       }, null, 2) + "\n"
       spiderFile.setText(payload)
@@ -1177,6 +1209,9 @@ Item {
 
     root.suits = g.suits
     root.stock = g.s
+    root.stockDealt = Array.isArray(g.td) && g.td.length === 5
+      ? [g.td[0] === true, g.td[1] === true, g.td[2] === true, g.td[3] === true, g.td[4] === true]
+      : Array.from({length: 5}, function() { return false })
     root.tabl = g.t
     root.faceUp = up
     root.completed = Array.isArray(g.f) ? g.f.filter(function(s) {
