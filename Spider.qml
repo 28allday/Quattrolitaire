@@ -129,6 +129,7 @@ Item {
 
   function undo() {
     if (!root.canUndo) return
+    root.cancelFlip()
     var h = root.history.slice()
     var st = JSON.parse(h.pop())
     root.history = h
@@ -183,6 +184,7 @@ Item {
     root.history = []
     root.dragInsts = []
     root.pendingSuits = 0
+    root.cancelFlip()
     root.stats = root.bumpStats(root.stats, root.suits, "played")
     stopCascade()
     root.touch()
@@ -197,9 +199,102 @@ Item {
     root.newGame()
   }
 
+  // -------------------------------------------------------- reveal flips
+  // Borrowed wholesale from the Klondike board: lifting a run doesn't turn
+  // the card under it face-up right away — the flip waits for the leaving
+  // card to land (its 130ms animation plus a beat), then turns the exposed
+  // card over on its vertical axis, swapping back for face at the moment it
+  // is edge-on and neither side shows.
+  property int flipCard: -1          // the card mid-turn, if any
+  property int pendingFlipCol: -1    // column owed a flip once its card lands
+  property real flipScale: 1
+
+  function applyFlip(ci) {
+    if (ci < 0) return
+    var col = root.tabl[ci]
+    if (col.length === 0) return
+    var t = col[col.length - 1]
+    if (root.faceUp[t] === true) return   // idempotent, so flushing is safe
+    var u = root.faceUp.slice()
+    u[t] = true
+    root.faceUp = u
+    root.touch()
+    root.save()
+  }
+
+  function scheduleFlip(ci) {
+    if (ci < 0 || ci > 9) return
+    var col = root.tabl[ci]
+    if (col.length === 0) return
+    if (root.faceUp[col[col.length - 1]] === true) return
+    root.pendingFlipCol = ci
+    flipDelay.restart()
+  }
+
+  // Anything that moves the model on must resolve an owed flip first, so a
+  // snapshot or a following move never sees a half-finished one.
+  function flushFlip() {
+    if (flipAnim.running) {
+      var mid = flipAnim.column
+      flipAnim.stop()
+      root.flipScale = 1
+      root.flipCard = -1
+      root.applyFlip(mid)
+    }
+    if (root.pendingFlipCol >= 0) {
+      flipDelay.stop()
+      var ci = root.pendingFlipCol
+      root.pendingFlipCol = -1
+      root.applyFlip(ci)
+    }
+  }
+
+  // Undo and a new deal drop the flip instead: the state they restore already
+  // says whether that card is face up.
+  function cancelFlip() {
+    flipDelay.stop()
+    flipAnim.stop()
+    root.pendingFlipCol = -1
+    root.flipCard = -1
+    root.flipScale = 1
+  }
+
+  Timer {
+    id: flipDelay
+    interval: 150                       // just past the 130ms card-landing move
+    onTriggered: {
+      var ci = root.pendingFlipCol
+      root.pendingFlipCol = -1
+      if (ci < 0) return
+      var col = root.tabl[ci]
+      if (col.length === 0) return
+      var t = col[col.length - 1]
+      if (root.faceUp[t] === true) return
+      root.flipCard = t
+      flipAnim.column = ci
+      flipAnim.restart()
+    }
+  }
+
+  SequentialAnimation {
+    id: flipAnim
+    property int column: -1
+    NumberAnimation {
+      target: root; property: "flipScale"; from: 1; to: 0
+      duration: 90; easing.type: Easing.InQuad
+    }
+    ScriptAction { script: root.applyFlip(flipAnim.column) }
+    NumberAnimation {
+      target: root; property: "flipScale"; from: 0; to: 1
+      duration: 110; easing.type: Easing.OutQuad
+    }
+    ScriptAction { script: root.flipCard = -1 }
+  }
+
   // Leaving Spider mode: drop transient UI so returning shows a clean board
   // (or the win banner the player already read, which close() resets).
   function deactivate() {
+    root.flushFlip()                    // an owed reveal settles before hiding
     root.cancelDrag()
     root.pendingSuits = 0
     root.touch()
@@ -290,6 +385,7 @@ Item {
 
   function deal() {
     if (!root.canDeal || root.dragging) return
+    root.flushFlip()          // an owed reveal settles before the row lands
     root.pushHistory()
 
     var st = root.stock.slice()
@@ -329,6 +425,7 @@ Item {
 
   // The single mutation path for moving a run.
   function doMove(insts, src, dst) {
+    root.flushFlip()          // settle anything the previous move still owes
     root.pushHistory()
     root.takeFrom(src, insts.length)
 
@@ -341,6 +438,7 @@ Item {
     root.moves++
     root.checkCompleted()
     root.checkWin()
+    if (src.charAt(0) === "t") root.scheduleFlip(parseInt(src.substring(1)))
     root.touch()
     root.save()
   }
@@ -784,6 +882,15 @@ Item {
         scale: cardItem.held ? 1.04 : 1.0
         Behavior on scale { NumberAnimation { duration: 90 } }
 
+        // Turning over: squeeze to edge-on and back out again. Only one card
+        // is ever mid-flip, so a single root-level driver is enough — the
+        // same arrangement as the Klondike board.
+        transform: Scale {
+          origin.x: body.width / 2
+          origin.y: body.height / 2
+          xScale: cardItem.inst === root.flipCard ? root.flipScale : 1
+        }
+
         Image {
           anchors.fill: parent
           source: cardItem.info.up ? root.cardImage(cardItem.inst) : root.backImage
@@ -1070,6 +1177,7 @@ Item {
     root.started = true
     root.history = []
     root.cancelDrag()
+    root.cancelFlip()
     root.touch()
     return true
   }

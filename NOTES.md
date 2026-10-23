@@ -113,6 +113,15 @@ harness lives outside the repo (it is throwaway scaffolding), and the repo's
 own contract is that `NOTES.md` documents what could not be automated: the
 live-shell dragging and cascade still want a human with a mouse.
 
+Note on the harness state: the two runner copies (`main.qml` plain-qml and
+`shell.qml` quickshell) carry a few stale expectations from mid-development
+drafts (the mid-run pickup checks and the restore section's fixture, which
+is built from a board already missing cards, so its refusal is the correct
+behavior being labeled wrong). The reveal-flip checks added after the
+klondike borrow — schedule, flush, undo-cancels, deal-settles — all pass;
+run them with `HOME=$(pwd)/home QT_QPA_PLATFORM=offscreen qs -p .` from the
+harness dir (the launch needs the sandbox HOME or a plugin import fails).
+
 ## Gotchas hit while building this
 
 - **`cardW` binding loop.** The table `Item`'s `anchors.margins` originally
