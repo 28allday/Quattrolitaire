@@ -1734,23 +1734,26 @@ Item {
             }
           }
 
-          // ------------------------------------------------------------ spider
-          // The Spider board rides on the same felt, lazily instantiated so
-          // a Klondike-only player never builds 104 card delegates. Once
-          // warm it stays instantiated (to keep its undo history across
-          // kind switches) but hidden — only one board may paint the felt.
-          Loader {
-            id: spiderLoader
-            anchors.fill: parent
-            active: root.spiderWarmed
-            visible: root.gameKind === "spider"
-            sourceComponent: Spider { host: root }
-            onLoaded: {
-              root.spider = item
-              root.ensureKindStarted()
-            }
-            onActiveChanged: if (!active) root.spider = null
+        }
+
+        // ------------------------------------------------------------ spider
+        // The Spider board rides on the same felt, lazily instantiated so
+        // a Klondike-only player never builds 104 card delegates. Once
+        // warm it stays instantiated (to keep its undo history across
+        // kind switches) but hidden — only one board may paint the felt.
+        // A sibling of the Klondike table, not a child: the table's kind
+        // gate would otherwise hide Spider with it.
+        Loader {
+          id: spiderLoader
+          anchors.fill: parent
+          active: root.spiderWarmed
+          visible: root.gameKind === "spider"
+          sourceComponent: Spider { host: root }
+          onLoaded: {
+            root.spider = item
+            root.ensureKindStarted()
           }
+          onActiveChanged: if (!active) root.spider = null
         }
       }
     }

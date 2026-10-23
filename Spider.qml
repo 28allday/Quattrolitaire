@@ -43,6 +43,12 @@ import qs.Ui
 Item {
   id: root
 
+  // The Loader resizes its item at creation, which can be a transient moment
+  // in the parent chain — this board once came up −8×−8 and stayed that size,
+  // rendering nothing. Anchoring to the Loader directly makes the size a live
+  // binding instead of a one-shot copy.
+  anchors.fill: parent
+
   // The panel root, for the shared theme tokens and the opened flag. Bound by
   // the Loader's inline sourceComponent.
   property var host: null
