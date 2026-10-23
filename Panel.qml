@@ -545,6 +545,9 @@ Item {
     if (root.gameKind === kind) return
     if (kind === "spider") root.spiderWarmed = true
     root.gameKind = kind
+    // The kind being shown may have no game (Spider's board can be warm but
+    // idle); entering it deals the same way opening the panel does.
+    Qt.callLater(root.ensureKindStarted)
     root.touch()
     root.save()
   }
@@ -1733,13 +1736,14 @@ Item {
 
           // ------------------------------------------------------------ spider
           // The Spider board rides on the same felt, lazily instantiated so
-          // a Klondike-only player never builds 104 card delegates.
+          // a Klondike-only player never builds 104 card delegates. Once
+          // warm it stays instantiated (to keep its undo history across
+          // kind switches) but hidden — only one board may paint the felt.
           Loader {
             id: spiderLoader
             anchors.fill: parent
             active: root.spiderWarmed
-            // Hidden (not destroyed) while Klondike is on the felt — see the
-            // spiderWarmed note in the model section.
+            visible: root.gameKind === "spider"
             sourceComponent: Spider { host: root }
             onLoaded: {
               root.spider = item

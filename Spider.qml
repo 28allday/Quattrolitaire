@@ -1093,6 +1093,12 @@ Item {
     }
 
     root.stateLoaded = true
+    // The state file often finishes loading after the first ensure() call
+    // (the board's loader warms up while the file is still in flight), and
+    // that call no-ops on an unloaded board. If Spider is what the player is
+    // looking at right now, deal now that the load has settled.
+    if (root.host && root.host.gameKind === "spider" && root.host.opened)
+      root.ensure()
   }
 
   FileView {
