@@ -1239,12 +1239,14 @@ Item {
           font.bold: true
         }
 
-        // Kind switch, straight after the title. Selecting a kind shows that
-        // board with whatever game it has going; it never deals by itself.
+        // Kind switch, straight after the title (anchored to it, so it can
+        // never sit on top of whatever the title measures). Selecting a kind
+        // shows that board with whatever game it has going; it never deals
+        // by itself.
         Row {
           id: kindTabs
-          anchors.left: parent.left
-          anchors.leftMargin: title.implicitWidth + Style.spacing.lg
+          anchors.left: title.right
+          anchors.leftMargin: Style.spacing.md
           anchors.verticalCenter: parent.verticalCenter
           spacing: Style.spacing.xs
 
