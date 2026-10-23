@@ -1,18 +1,25 @@
 # Quattrolitaire
 
-Klondike solitaire as a native Omarchy shell plugin. A drag-and-drop card
-table with an illustrated art-deco deck, on felt coloured from the active
-Omarchy theme. The deck ships in the repo, so there is nothing to fetch and
-nothing to build.
+Klondike **and Spider** solitaire as a native Omarchy shell plugin. A
+drag-and-drop card table with an illustrated art-deco deck, on felt coloured
+from the active Omarchy theme. The deck ships in the repo, so there is
+nothing to fetch and nothing to build.
 
 ![The table mid-game](screenshots/table.jpg)
 
-- Draw 1 or draw 3, switchable mid-game
-- Drag a card or a run; double-click sends a card straight to a foundation
-- Unlimited undo, standard Klondike scoring with a time bonus
-- **Auto** finishes the game once every card is face up
-- The game in progress is saved, so it survives closing the panel *and*
-  restarting the shell
+- Two kinds, switched in the panel header; each keeps its own game and stats
+- **Klondike**: draw 1 or draw 3, switchable mid-game; drag a card or a run;
+  double-click sends a card straight to a foundation; unlimited undo,
+  standard scoring with a time bonus; **Auto** finishes the game once every
+  card is face up
+- **Spider**: two decks on ten columns, at 1, 2 or 4 suits; drag any
+  same-suit descending run; completed K→A suit runs come off the table (+100)
+  and eight of them win; space deals a row of ten (blocked while a column is
+  empty); undo, 500-point start, −1 per move
+- Wins are tracked separately — Klondike's tally, and Spider's per
+  difficulty
+- The in-progress game of each kind is saved separately, so both survive
+  closing the panel *and* restarting the shell, in either mode
 
 ## Install
 
@@ -56,8 +63,12 @@ piece of plumbing needs **`jq`**, which Omarchy already installs: see below.
 
 ## What it writes, and what it does not
 
-- `~/.local/state/omarchy-quattrolitaire/state.json` — the game in progress,
-  the draw mode and the win record. Written after each move.
+- `~/.local/state/omarchy-quattrolitaire/state.json` — the Klondike game in
+  progress, which kind is showing, the draw mode and the win record. Written
+  after each move.
+- `~/.local/state/omarchy-quattrolitaire/spider.json` — the Spider game in
+  progress, the chosen difficulty and the win record per difficulty. Written
+  after each move.
 - `~/.config/omarchy/shell.json` — **on first open**, the plugin appends its
   own `{"id": "nosignal.quattrolitaire"}` entry to `plugins[]` if one is not
   already there, using `jq`. This is a workaround: `omarchy plugin enable`
@@ -75,20 +86,27 @@ directory.
 
 ## Scoring
 
-Standard Klondike: +10 onto a foundation, +5 for waste-to-tableau, +5 for
-turning a tableau card face up, −15 for taking a card back off a foundation,
-and a recycle penalty of −100 in draw-1 (−20 in draw-3). Finishing in over
-30 seconds adds a time bonus; finishing faster is worth more.
+**Klondike** — standard: +10 onto a foundation, +5 for waste-to-tableau, +5
+for turning a tableau card face up, −15 for taking a card back off a
+foundation, and a recycle penalty of −100 in draw-1 (−20 in draw-3).
+Finishing in over 30 seconds adds a time bonus; finishing faster is worth
+more.
+
+**Spider** — starts at 500, −1 per move, +100 for every completed K→A suit
+run, and eight sets end the game. Deal keys: Klondike `1`/`3` pick draw
+modes; Spider `1`/`2`/`4` pick suits (re-deal, asks first mid-game).
 
 ## Where things live
 
 | Path | What |
 | --- | --- |
 | `manifest.json` | Plugin manifest — `panel` + `bar-widget`, `keepLoaded` |
-| `Panel.qml` | The whole game: model, layout, cards, drag, cascade |
+| `Panel.qml` | The Klondike game: model, layout, cards, drag, cascade. Also the panel chrome and the kind switch both boards share |
+| `Spider.qml` | The Spider game: model, layout, drag, completions, cascade — mounted on the panel's felt |
 | `cards/` | The deck: 52 faces, a shared back, and the table tile |
 | `BarWidget.qml` | Bar icon; toggles the panel over shell IPC |
-| `~/.local/state/omarchy-quattrolitaire/state.json` | Saved game, draw mode, win record |
+| `~/.local/state/omarchy-quattrolitaire/state.json` | Klondike game, draw mode, win record, which kind |
+| `~/.local/state/omarchy-quattrolitaire/spider.json` | Spider game, difficulty, win records per difficulty |
 
 ## Card art
 

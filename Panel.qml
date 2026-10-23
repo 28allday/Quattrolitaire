@@ -11,6 +11,14 @@ import qs.Ui
 // The host calls open(payloadJson) / close() and reads `opened`; it also
 // injects `shell` right after the Loader resolves (see onShellChanged).
 //
+// Two kinds share this panel: Klondike (the original board, modelled in this
+// file) and Spider (its own board in Spider.qml, mounted on the same felt).
+// `gameKind` decides which one is on the table; each keeps its own model,
+// undo history and state file, so switching kinds mid-game leaves both games
+// exactly where they were. The shared half is everything around the table:
+// the chrome, the felt, the header, and this file's persistence for kind +
+// Klondike stats.
+//
 // The cards are bundled artwork in cards/ — one PNG per card plus a shared
 // back, named by card code. Everything around them is drawn from the live
 // theme palette, so the felt, the pile outlines and the panel chrome recolour
@@ -111,6 +119,19 @@ Item {
   }
 
   // ------------------------------------------------------------- game model
+
+  // Two kinds, one panel. Klondike lives in this file; Spider is a sibling
+  // board (Spider.qml) mounted over the same felt when selected. Each kind
+  // owns its model, undo history and its own state file — `gameKind` is the
+  // only thing that crosses, and it is persisted so a restart reopens the
+  // kind the player left.
+  property string gameKind: "klondike"          // "klondike" | "spider"
+  // Once Spider has been entered, its board stays instantiated even while
+  // Klondike is showing — a kind switch must not rebuild the Spider game and
+  // drop its undo history, and the cost of one idle 104-delegate board is
+  // nothing compared to that.
+  property bool spiderWarmed: false
+  property var spider: null                     // live Spider board, null until its Loader is warm
 
   property var stock: []                       // face down, last element = top
   property var waste: []                       // face up, last element = top
@@ -512,6 +533,71 @@ Item {
     root.touch()
   }
 
+  // ------------------------------------------------------------ kind routing
+  //
+  // Everything shared — the header buttons, the keyboard, the status row —
+  // goes through these, so no call site needs to know which model it is
+  // driving. Switching kinds never deals: the in-progress game of each kind
+  // is preserved in its own state file, so a switch back resumes it.
+
+  function setGameKind(kind) {
+    if (kind !== "klondike" && kind !== "spider") return
+    if (root.gameKind === kind) return
+    if (kind === "spider") root.spiderWarmed = true
+    root.gameKind = kind
+    root.touch()
+    root.save()
+  }
+
+  // Deal when the active kind has no game. Klondike's file load and open()
+  // both funnel here; Spider is reached through its board, which may need
+  // another tick to be warm.
+  function ensureKindStarted() {
+    if (!root.stateLoaded) return
+    if (root.gameKind === "klondike") {
+      if (!root.started) root.newGame()
+    } else if (root.spider) {
+      root.spider.ensure()
+    }
+  }
+
+  function kindNewGame() {
+    if (root.gameKind === "spider") { if (root.spider) root.spider.newGame() }
+    else root.newGame()
+  }
+
+  function kindUndo() {
+    if (root.gameKind === "spider") { if (root.spider) root.spider.undo() }
+    else root.undo()
+  }
+
+  function kindDraw() {
+    if (root.gameKind === "spider") { if (root.spider) root.spider.deal() }
+    else root.draw()
+  }
+
+  function kindSuits(n) {
+    if (root.gameKind === "spider" && root.spider) root.spider.requestSuits(n)
+  }
+
+  function kindUndoable() {
+    if (root.gameKind === "spider") return root.spider ? root.spider.canUndo : false
+    return root.history.length > 0 && !root.won && !root.autoRunning
+  }
+
+  function kindNewable() {
+    if (root.gameKind === "spider") return root.spider ? root.spider.stateLoaded : false
+    return root.stateLoaded
+  }
+
+  // The status row's left text for the active kind. QML captures the reads
+  // made inside the calls, so the row stays live for either board.
+  function statusText() {
+    if (root.gameKind === "spider" && root.spider) return root.spider.statusText()
+    return "Score " + root.score + "   ·   Moves " + root.moves + "   ·   " + root.timeText()
+      + (root.stats.won > 0 ? "   ·   Won " + root.stats.won + "/" + root.stats.played : "")
+  }
+
   // --------------------------------------------------------------- finishing
 
   // Offered once every card is face up: from there the game is decided and
@@ -585,7 +671,9 @@ Item {
   Timer {
     interval: 1000
     repeat: true
-    running: root.opened && root.started && !root.won
+    // Klondike's clock only while Klondike is the kind on the felt — the
+    // Spider board keeps running underneath the panel otherwise.
+    running: root.opened && root.gameKind === "klondike" && root.started && !root.won
     onTriggered: root.seconds++
   }
 
@@ -615,7 +703,8 @@ Item {
     repeat: false
     onTriggered: {
       var payload = JSON.stringify({
-        version: 1,
+        version: 2,
+        kind: root.gameKind,
         drawCount: root.drawCount,
         stats: root.stats,
         game: (root.started && !root.won) ? {
@@ -678,6 +767,12 @@ Item {
     try { st = JSON.parse(String(raw || "").trim()) } catch (e) {}
 
     if (st && typeof st === "object") {
+      if (st.kind === "spider") {
+        root.gameKind = "spider"
+        root.spiderWarmed = true
+      } else {
+        root.gameKind = "klondike"
+      }
       if (Number(st.drawCount) === 3) root.drawCount = 3
       if (st.stats && typeof st.stats === "object") {
         root.stats = {
@@ -691,7 +786,10 @@ Item {
     }
 
     root.stateLoaded = true
-    root.newGame()
+    if (root.gameKind === "klondike") root.newGame()
+    // Spider mode with no game on file: the board is not warm yet, and its
+    // own loader or ensureKindStarted() deals when it is.
+    else if (root.spider) root.spider.ensure()
   }
 
   FileView {
@@ -717,7 +815,9 @@ Item {
   function open(payloadJson) {
     root.opened = true
     root.ensureSelfReference()
-    if (root.stateLoaded && !root.started) root.newGame()
+    // The active kind gets a deal when nothing is going; callLater lets the
+    // Spider Loader warm up first when a restart reopens Spider mode.
+    Qt.callLater(root.ensureKindStarted)
     Qt.callLater(function() { keyCatcher.forceActiveFocus() })
   }
 
@@ -729,7 +829,12 @@ Item {
     root.flushFlip()
     // A finished game is history the moment you look away: the next open
     // deals rather than greeting you with the scoreboard you already read.
-    if (root.won) root.newGame()
+    // The same goes for a finished Spider.
+    if (root.gameKind === "klondike" && root.won) root.newGame()
+    if (root.spider) {
+      if (root.spider.won) root.spider.newGame()
+      root.spider.deactivate()
+    }
     if (root.shell && typeof root.shell.hide === "function")
       root.shell.hide(root.selfId)
   }
@@ -1089,17 +1194,22 @@ Item {
           if (event.key === Qt.Key_Escape || event.key === Qt.Key_Q) {
             root.close()
           } else if (event.key === Qt.Key_N) {
-            root.newGame()
+            root.kindNewGame()
           } else if (event.key === Qt.Key_U || event.key === Qt.Key_Z) {
-            root.undo()
+            root.kindUndo()
           } else if (event.key === Qt.Key_A) {
-            root.startAuto()
+            if (root.gameKind === "klondike") root.startAuto()
           } else if (event.key === Qt.Key_Space || event.key === Qt.Key_D) {
-            root.draw()
+            root.kindDraw()
           } else if (event.key === Qt.Key_1) {
-            root.setDrawCount(1)
+            if (root.gameKind === "spider") root.kindSuits(1)
+            else root.setDrawCount(1)
+          } else if (event.key === Qt.Key_2) {
+            if (root.gameKind === "spider") root.kindSuits(2)
           } else if (event.key === Qt.Key_3) {
-            root.setDrawCount(3)
+            if (root.gameKind === "klondike") root.setDrawCount(3)
+          } else if (event.key === Qt.Key_4) {
+            if (root.gameKind === "spider") root.kindSuits(4)
           } else {
             return
           }
@@ -1129,6 +1239,33 @@ Item {
           font.bold: true
         }
 
+        // Kind switch, straight after the title. Selecting a kind shows that
+        // board with whatever game it has going; it never deals by itself.
+        Row {
+          id: kindTabs
+          anchors.left: parent.left
+          anchors.leftMargin: title.implicitWidth + Style.spacing.lg
+          anchors.verticalCenter: parent.verticalCenter
+          spacing: Style.spacing.xs
+
+          Button {
+            text: "Klondike"
+            bordered: true
+            selected: root.gameKind === "klondike"
+            fontFamily: root.fontFamily
+            tooltipText: "Draw-one style solitaire"
+            onClicked: root.setGameKind("klondike")
+          }
+          Button {
+            text: "Spider"
+            bordered: true
+            selected: root.gameKind === "spider"
+            fontFamily: root.fontFamily
+            tooltipText: "Two decks, ten columns, eight suit runs"
+            onClicked: root.setGameKind("spider")
+          }
+        }
+
         Row {
           id: controls
           anchors.right: parent.right
@@ -1140,20 +1277,23 @@ Item {
             bordered: true
             fontFamily: root.fontFamily
             tooltipText: "Deal a new game  (n)"
-            onClicked: root.newGame()
+            enabled: root.kindNewable()
+            opacity: enabled ? 1 : 0.4
+            onClicked: root.kindNewGame()
           }
           Button {
             text: "Undo"
             bordered: true
             fontFamily: root.fontFamily
             tooltipText: "Take back the last move  (u)"
-            enabled: root.history.length > 0 && !root.won && !root.autoRunning
+            enabled: root.kindUndoable()
             opacity: enabled ? 1 : 0.4
-            onClicked: root.undo()
+            onClicked: root.kindUndo()
           }
           Button {
             text: root.autoRunning ? "Finishing…" : "Auto"
             bordered: true
+            visible: root.gameKind === "klondike"
             fontFamily: root.fontFamily
             tooltipText: "Play the rest out automatically  (a)"
             enabled: root.canAuto && !root.autoRunning
@@ -1161,8 +1301,19 @@ Item {
             onClicked: root.startAuto()
           }
           Button {
+            text: "Deal"
+            bordered: true
+            visible: root.gameKind === "spider"
+            fontFamily: root.fontFamily
+            tooltipText: "Deal a row of ten — blocked while a column is empty  (space)"
+            enabled: root.spider ? root.spider.canDeal : false
+            opacity: enabled ? 1 : 0.4
+            onClicked: root.kindDraw()
+          }
+          Button {
             text: "Draw 1"
             bordered: true
+            visible: root.gameKind === "klondike"
             selected: root.drawCount === 1
             fontFamily: root.fontFamily
             tooltipText: "Turn one card at a time  (1)"
@@ -1171,10 +1322,38 @@ Item {
           Button {
             text: "Draw 3"
             bordered: true
+            visible: root.gameKind === "klondike"
             selected: root.drawCount === 3
             fontFamily: root.fontFamily
             tooltipText: "Turn three at a time  (3)"
             onClicked: root.setDrawCount(3)
+          }
+          Button {
+            text: "1 Suit"
+            bordered: true
+            visible: root.gameKind === "spider"
+            selected: root.spider !== null && root.spider.suits === 1
+            fontFamily: root.fontFamily
+            tooltipText: "Eight spade decks  (1) — re-deals"
+            onClicked: root.kindSuits(1)
+          }
+          Button {
+            text: "2 Suits"
+            bordered: true
+            visible: root.gameKind === "spider"
+            selected: root.spider !== null && root.spider.suits === 2
+            fontFamily: root.fontFamily
+            tooltipText: "Four spades, four hearts  (2) — re-deals"
+            onClicked: root.kindSuits(2)
+          }
+          Button {
+            text: "4 Suits"
+            bordered: true
+            visible: root.gameKind === "spider"
+            selected: root.spider !== null && root.spider.suits === 4
+            fontFamily: root.fontFamily
+            tooltipText: "The real thing  (4) — re-deals"
+            onClicked: root.kindSuits(4)
           }
         }
       }
@@ -1191,8 +1370,7 @@ Item {
           id: statusLeft
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
-          text: "Score " + root.score + "   ·   Moves " + root.moves + "   ·   " + root.timeText()
-            + (root.stats.won > 0 ? "   ·   Won " + root.stats.won + "/" + root.stats.played : "")
+          text: root.statusText()
           color: root.foreground
           opacity: 0.65
           font.family: root.fontFamily
@@ -1202,7 +1380,9 @@ Item {
         Text {
           anchors.right: parent.right
           anchors.verticalCenter: parent.verticalCenter
-          text: "drag to play · double-click sends a card up · esc close"
+          text: root.gameKind === "spider"
+                ? "drag to play · space deals a row · esc close"
+                : "drag to play · double-click sends a card up · esc close"
           color: root.foreground
           opacity: 0.4
           font.family: root.fontFamily
@@ -1253,6 +1433,10 @@ Item {
 
         Item {
           id: table
+          // The Klondike board. Spider mounts its own over the same felt
+          // (below); `gameKind` is the switch, and each board keeps its
+          // modelled state while the other is showing.
+          visible: root.gameKind === "klondike"
           anchors.fill: parent
           // Derived from the felt, never from cardW: cardW is measured off
           // this item, so a margin that reads it back is a binding loop.
@@ -1543,6 +1727,23 @@ Item {
                 onClicked: root.newGame()
               }
             }
+          }
+
+          // ------------------------------------------------------------ spider
+          // The Spider board rides on the same felt, lazily instantiated so
+          // a Klondike-only player never builds 104 card delegates.
+          Loader {
+            id: spiderLoader
+            anchors.fill: parent
+            active: root.spiderWarmed
+            // Hidden (not destroyed) while Klondike is on the felt — see the
+            // spiderWarmed note in the model section.
+            sourceComponent: Spider { host: root }
+            onLoaded: {
+              root.spider = item
+              root.ensureKindStarted()
+            }
+            onActiveChanged: if (!active) root.spider = null
           }
         }
       }
