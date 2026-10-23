@@ -980,7 +980,12 @@ Item {
         }
 
         onReleased: function(mouse) {
-          if (cardItem.info.pile.charAt(0) === "s") { root.deal(); return }
+          if (cardItem.info.pile.charAt(0) === "s") {
+            // The pile the card belongs to is the pile that gets dealt —
+            // its slot rides along in the pile code.
+            root.deal(parseInt(cardItem.info.pile.substring(1)))
+            return
+          }
           if (!grab.armed) return
           grab.armed = false
           if (root.dragMoved) root.dropDrag()
