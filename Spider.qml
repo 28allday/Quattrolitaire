@@ -1182,9 +1182,11 @@ Item {
     }
   }
 
-  // A saved game restores only when it still holds a full, unduplicated deck
-  // of 104 and its own suits value is a real one — a truncated or hand-edited
-  // file deals nothing rather than half a game.
+  // A saved game restores only when it still holds a consistent deck —
+  // every instance on the board or in one of the completed sets, the five
+  // stock piles shared out in whole rounds — and its own suits value is a
+  // real one. A truncated or hand-edited file deals nothing rather than
+  // half a game.
   function restoreGame(g) {
     if (!g || typeof g !== "object") return false
     if (g.suits !== 1 && g.suits !== 2 && g.suits !== 4) return false
@@ -1206,22 +1208,54 @@ Item {
     if (!claim(g.s)) return false
     if (!Array.isArray(g.t) || g.t.length !== 10) return false
     for (i = 0; i < 10; i++) if (!claim(g.t[i])) return false
-    for (i = 0; i < 104; i++) if (!seen[i]) return false
+
+    // Completed sets have left the board — each was one suit's 13-card
+    // K→A — so exactly 13 × n instances may be missing from stock ∪
+    // tableau. The suits in the list must be ones the difficulty's deck
+    // actually contains, no more often than that deck contains them.
+    root.suits = g.suits
+    var ceiling = g.suits === 1 ? 1 : g.suits === 2 ? 2 : 4
+    var perSuit = g.suits === 1 ? 8 : g.suits === 2 ? 4 : 2
+    var fin = []
+    if (Array.isArray(g.f)) {
+      for (i = 0; i < g.f.length; i++) {
+        var fv = g.f[i]
+        if (typeof fv !== "number" || fv < 0 || fv >= ceiling
+            || fv !== Math.floor(fv)) return false
+        fin.push(fv)
+      }
+    }
+    if (fin.length > 8) return false
+    var perSuitCount = [0, 0, 0, 0]
+    for (i = 0; i < fin.length; i++) {
+      perSuitCount[fin[i]]++
+      if (perSuitCount[fin[i]] > perSuit) return false
+    }
+
+    var missing = 0
+    for (i = 0; i < 104; i++) if (!seen[i]) missing++
+    if (missing !== fin.length * 13) return false
+
     if (!Array.isArray(g.u) || g.u.length !== 104) return false
 
     var up = []
     for (i = 0; i < 104; i++) up.push(g.u[i] === true)
 
-    root.suits = g.suits
-    root.stock = g.s
-    root.stockDealt = Array.isArray(g.td) && g.td.length === 5
+    // The stock holds exactly the rounds of the piles not yet dealt: a td
+    // marking more stayers than the stock has cards for would make deal()
+    // slice past the stock's end.
+    var td = Array.isArray(g.td) && g.td.length === 5
       ? [g.td[0] === true, g.td[1] === true, g.td[2] === true, g.td[3] === true, g.td[4] === true]
-      : Array.from({length: 5}, function() { return false })
+      : [false, false, false, false, false]
+    var livePiles = 0
+    for (i = 0; i < 5; i++) if (td[i] !== true) livePiles++
+    if (g.s.length !== livePiles * 10) return false
+
+    root.stock = g.s
+    root.stockDealt = td
     root.tabl = g.t
     root.faceUp = up
-    root.completed = Array.isArray(g.f) ? g.f.filter(function(s) {
-      return s === 0 || s === 1 || s === 2 || s === 3
-    }) : []
+    root.completed = fin
     root.score = Math.max(0, Number(g.sc) || 0)
     root.moves = Math.max(0, Number(g.mv) || 0)
     root.deals = Math.max(0, Number(g.ps) || 0)

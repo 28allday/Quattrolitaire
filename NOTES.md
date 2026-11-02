@@ -140,9 +140,12 @@ read K→A inside one suit block — with suits=2, blocks 0–3 are spades and
   games). The kbd noise in the journal is that, not a shell bug. Test keys on
   a real keyboard.
 - **Panel instances can be rebuilt.** State is written to disk after each move
-  (debounced 400ms), and `restoreGame()` validates that the file still holds a
-  full unduplicated deck before trusting it. A half-written or hand-edited
-  file deals a fresh game instead of half of one.
+  (debounced 400ms), and `restoreGame()` validates that the file is internally
+  consistent: every instance still on the board or in one of the completed
+  sets, completed suits only ones the difficulty's deck contains and no more
+  often than it contains them, and the stock exactly the rounds of the piles
+  not yet dealt. A half-written or hand-edited file deals a fresh game instead
+  of half of one.
 
 ## Plugin plumbing
 
