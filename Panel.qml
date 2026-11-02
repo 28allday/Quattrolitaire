@@ -545,6 +545,10 @@ Item {
     if (root.gameKind === kind) return
     if (kind === "spider") root.spiderWarmed = true
     root.gameKind = kind
+    // Leaving Spider drops its transient UI (an owed flip, a drag, the
+    // difficulty question) so returning shows the resting board; the board
+    // itself stays warm and keeps its game across the switch.
+    if (kind !== "spider" && root.spider) root.spider.deactivate()
     // The kind being shown may have no game (Spider's board can be warm but
     // idle); entering it deals the same way opening the panel does.
     Qt.callLater(root.ensureKindStarted)
@@ -596,7 +600,9 @@ Item {
   // The status row's left text for the active kind. QML captures the reads
   // made inside the calls, so the row stays live for either board.
   function statusText() {
-    if (root.gameKind === "spider" && root.spider) return root.spider.statusText()
+    // Spider with no board yet (the loader still warming) shows a blank
+    // line for its one frame rather than Klondike's numbers flashing by.
+    if (root.gameKind === "spider") return root.spider ? root.spider.statusText() : ""
     return "Score " + root.score + "   ·   Moves " + root.moves + "   ·   " + root.timeText()
       + (root.stats.won > 0 ? "   ·   Won " + root.stats.won + "/" + root.stats.played : "")
   }
@@ -651,7 +657,9 @@ Item {
     id: autoTimer
     interval: 90
     repeat: true
-    running: root.autoRunning && root.opened
+    // Klondike's clock-style gate: away from Klondike it must not play the
+    // hidden board out under Spider.
+    running: root.autoRunning && root.opened && root.gameKind === "klondike"
     onTriggered: root.autoStep()
   }
 
@@ -832,8 +840,9 @@ Item {
     root.flushFlip()
     // A finished game is history the moment you look away: the next open
     // deals rather than greeting you with the scoreboard you already read.
-    // The same goes for a finished Spider.
-    if (root.gameKind === "klondike" && root.won) root.newGame()
+    // This holds no matter which kind was showing when the game was won —
+    // a won Klondike is reset even from Spider, and finished Spider below.
+    if (root.won) root.newGame()
     if (root.spider) {
       if (root.spider.won) root.spider.newGame()
       root.spider.deactivate()
@@ -1129,7 +1138,9 @@ Item {
     id: cascadeTimer
     interval: 16
     repeat: true
-    running: root.cascading && root.opened && root.won
+    // Pauses while another kind is showing; the cascade resumes on return
+    // to Klondike and finishes itself there.
+    running: root.cascading && root.opened && root.won && root.gameKind === "klondike"
     onTriggered: root.stepCascade()
   }
 
