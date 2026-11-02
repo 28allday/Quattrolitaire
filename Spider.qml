@@ -71,7 +71,7 @@ Item {
   // ------------------------------------------------------------- game model
 
   property int suits: 2                         // 1 | 2 | 4, per game
-  property var stock: []                        // face down, last element = next deal
+  property var stock: []                        // face down, five deals of ten, dealt front first
   // Which of the five top-row slots have had their pile dealt already. Piles
   // never slide: a dealt pile empties its own slot and the others keep
   // theirs, so a pile you click is always the pile you see there.
@@ -408,7 +408,6 @@ Item {
     // The confirm box owns the board while it is up — nothing deals under it.
     if (!root.canDeal || root.dragging || root.pendingSuits > 0) return
     root.flushFlip()          // an owed reveal settles before the row lands
-    root.pushHistory()
 
     var from = slot
     if (from === undefined || from === null || from < 0 || from > 4) {
@@ -420,6 +419,9 @@ Item {
     } else if (root.stockDealt[from] === true) {
       return                                  // an already-dealt slot is not a deal
     }
+    // History enters only once the deal is definitely happening: the guard
+    // returns above are no-ops and must not spend an undo step.
+    root.pushHistory()
     // The clicked slot's cards are the window of the live piles ordered
     // before it — the slots under any dead piles are simply skipped.
     var win = 0
