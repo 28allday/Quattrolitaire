@@ -313,11 +313,20 @@ Item {
   property int pendingSuits: 0                   // 0 = none, else awaiting confirm
 
   function requestSuits(n) {
-    if (!root.started || root.won || root.pendingSuits === n) {
+    if (!root.started || root.won) {
       root.applySuits(n)
       return
     }
+    // Already asking at n — repeating the request does nothing, so a
+    // double click on the tab cannot confirm the redeal unseen. Only the
+    // dialog's own buttons apply or drop it.
+    if (root.pendingSuits === n) return
     root.pendingSuits = n
+  }
+
+  // "Keep playing": the question drops, the current deal stands.
+  function cancelPendingSuits() {
+    root.pendingSuits = 0
   }
 
   // Entering with no game going deals right away at the chosen difficulty;
@@ -396,7 +405,8 @@ Item {
   // Without a slot (keyboard, Deal button) the leftmost live pile is dealt,
   // same as clicking it.
   function deal(slot) {
-    if (!root.canDeal || root.dragging) return
+    // The confirm box owns the board while it is up — nothing deals under it.
+    if (!root.canDeal || root.dragging || root.pendingSuits > 0) return
     root.flushFlip()          // an owed reveal settles before the row lands
     root.pushHistory()
 
