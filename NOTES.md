@@ -29,6 +29,18 @@ Working state, open decisions and machine-specific notes are in
 bottom card first. `faceUp` is one flat array of 52 booleans. Nothing stores
 a card's position.
 
+**Spider works the same way, twice over.** Its model is 104 instance ids;
+`artSuit`/`artRank` in `Spider.qml` map each one to what it plays as under
+the chosen difficulty, so identical cards stay interchangeable and everything
+the rules need is derived from that mapping, never stored. Saved Spider
+games record their own suits value beside the cards. The completed-sets pile
+is the one place cards cease to be cards: a finished K→A run's 13 instances
+drop out of every pile and become a single suit entry in `completed`.
+Panel.qml hosts both boards — gameKind picks whose model is on the felt, and
+each kind keeps its own state file, so switching kinds mid-game preserves
+both games. The Spider board only instantiates once it has been entered, and
+stays warm after that rather than losing its undo history to a switch.
+
 **One layout function owns geometry.** `computeLayout()` turns the model into
 52 `{x, y, z, pile, idx, up}` records plus the column heights used for drop
 targeting. It is bound to `rev`, which `touch()` bumps after every mutation.
@@ -86,6 +98,30 @@ it has already loaded, so `paintCard()` requests the card on its first tick
 and paints nothing; the next tick has it. Cards fly one at a time, so that is
 one load per card and cached after.
 
+## Testing the rules headlessly
+
+The game logic is plain JS inside QML, and most of it can be exercised
+without the shell. A sandbox config that loads a stripped copy of `Spider.qml`
+(import lines dropped, `qs.*` theme tokens replaced by numbers or an inline
+stub Button) runs under its own `qs -p` with a throwaway `HOME`:
+deal shapes, drag legality, completed-run removal, deals-blocked-on-empty,
+undo, snapshot restore validation and the per-difficulty stats buckets all
+assert there. A gotcha the harness surfaced early: Quickshell maps `qs.*`
+imports to subdirectories of the *shell config dir*, and a plain `qml`
+runtime cannot resolve them at all — hence the stripped-copy trick. The
+harness lives outside the repo (it is throwaway scaffolding), and the repo's
+own contract is that `NOTES.md` documents what could not be automated: the
+live-shell dragging and cascade still want a human with a mouse.
+
+The suite asserts on the model side only; the harness stubs `home` so the
+state file round-trips in a throwaway directory, and a readback FileView is
+armed right before the final reload so the eager startup load cannot trip
+`finish()` early. Two expectations worth restating because they decode
+non-obviously: grabbing mid-run is legal and takes the shorter top-aligned
+tail (a broken tail is what gets refused), and the completion fixtures must
+read K→A inside one suit block — with suits=2, blocks 0–3 are spades and
+4–7 are hearts, so a run like [26..14] is spades and [78..65] is hearts.
+
 ## Gotchas hit while building this
 
 - **`cardW` binding loop.** The table `Item`'s `anchors.margins` originally
@@ -104,9 +140,12 @@ one load per card and cached after.
   games). The kbd noise in the journal is that, not a shell bug. Test keys on
   a real keyboard.
 - **Panel instances can be rebuilt.** State is written to disk after each move
-  (debounced 400ms), and `restoreGame()` validates that the file still holds a
-  full unduplicated deck before trusting it. A half-written or hand-edited
-  file deals a fresh game instead of half of one.
+  (debounced 400ms), and `restoreGame()` validates that the file is internally
+  consistent: every instance still on the board or in one of the completed
+  sets, completed suits only ones the difficulty's deck contains and no more
+  often than it contains them, and the stock exactly the rounds of the piles
+  not yet dealt. A half-written or hand-edited file deals a fresh game instead
+  of half of one.
 
 ## Plugin plumbing
 
@@ -124,4 +163,6 @@ one load per card and cached after.
 - Vegas scoring as an alternative to standard.
 - Right-click as "send to foundation" so left-click stays purely drag.
 - Seeded deals ("deal #1234") so a hand can be replayed or shared.
-- Spider / FreeCell as sibling kinds in the same panel.
+- FreeCell as a third sibling kind (Spider landed first).
+- Spider niceties: a flip animation for exposed card after set removal, and
+  a hint for an empty deal row blocked by an empty column.
