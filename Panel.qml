@@ -1057,8 +1057,31 @@ Item {
     color: "transparent"
     WlrLayershell.namespace: "omarchy-quattrolitaire"
     WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: root.opened ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     exclusionMode: ExclusionMode.Ignore
+
+    readonly property string barPosition: root.shell && root.shell.barConfig
+      ? String(root.shell.barConfig.position || "top") : "top"
+    readonly property real barSize: root.shell && root.shell.bar
+      ? Number(root.shell.bar.barSize || 0)
+      : (barPosition === "left" || barPosition === "right" ? Style.bar.sizeVertical : Style.bar.sizeHorizontal)
+    readonly property bool barHidden: root.shell && root.shell.bar
+      ? root.shell.bar.barHidden === true : false
+
+    // Let bar buttons receive clicks while this full-screen overlay is open.
+    // Without this cutout, the overlay closes on the bar click and the click
+    // can also dismiss another overlay below it.
+    mask: Region {
+      width: panel.width
+      height: panel.height
+      Region {
+        x: panel.barPosition === "right" ? panel.width - panel.barSize : 0
+        y: panel.barPosition === "bottom" ? panel.height - panel.barSize : 0
+        width: panel.barHidden ? 0 : ((panel.barPosition === "left" || panel.barPosition === "right") ? panel.barSize : panel.width)
+        height: panel.barHidden ? 0 : ((panel.barPosition === "top" || panel.barPosition === "bottom") ? panel.barSize : panel.height)
+        intersection: Intersection.Subtract
+      }
+    }
 
     MouseArea {
       anchors.fill: parent
